@@ -16,22 +16,16 @@ def get_aijobs_jobs():
     }
     
     try:
-        print(f"Intentando RSS: {url}")
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        print(f"Error HTTP: {e}")
-        print(f"Respuesta del servidor: {response.text}")
+        print(f"Error HTTP: {e}", file=sys.stderr)
         return None
     except requests.exceptions.RequestException as e:
-        print(f"Error de conexión: {e}")
+        print(f"Error de conexión: {e}", file=sys.stderr)
         return None
     
     if response.status_code == 200:
-        print("Contenido crudo del RSS (primeros 1000 caracteres):")
-        # Imprimir como UTF-8 explícitamente
-        print(response.text[:1000])
-        
         try:
             root = ET.fromstring(response.content)
             jobs = []
@@ -48,30 +42,26 @@ def get_aijobs_jobs():
                 }
                 jobs.append(job)
             
-            print(f"Número de trabajos encontrados: {len(jobs)}")
-            
             today = datetime.now().strftime("%Y-%m-%d")
+            hour = datetime.now().strftime("%H")  # Hora en formato 00-23
             aijobs_dir = os.path.join("data", "aijobs")
             os.makedirs(aijobs_dir, exist_ok=True)
-            file_path = os.path.join(aijobs_dir, f"{today}_aijobs_jobs.json")
+            file_path = os.path.join(aijobs_dir, f"{today}_aijobs_jobs_{hour}h.json")
             
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(jobs, f, indent=4)
             
-            print(f"Datos guardados en: {file_path}")
+            # Devolver solo el JSON de los trabajos como salida estándar
+            print(json.dumps(jobs))
             return jobs
         except ET.ParseError as e:
-            print(f"Error al parsear XML: {e}")
-            print("Contenido recibido:")
-            print(response.text)
+            print(f"Error al parsear XML: {e}", file=sys.stderr)
             return None
     else:
-        print(f"Error inesperado: {response.status_code}")
+        print(f"Error inesperado: {response.status_code}", file=sys.stderr)
         return None
 
 if __name__ == "__main__":
     jobs = get_aijobs_jobs()
-    if jobs:
-        print(f"Obtenidas {len(jobs)} ofertas de trabajo.")
-    else:
-        print("No se obtuvieron trabajos.")
+    if not jobs:
+        sys.exit(1)  # Salir con error si no se obtienen trabajos
