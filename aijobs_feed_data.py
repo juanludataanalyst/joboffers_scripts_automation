@@ -3,9 +3,14 @@ import os
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import json
+import sys
+
+# Configurar la salida para usar UTF-8 en Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def get_aijobs_jobs():
-    url = url = "https://aijobs.net/feed"
+    url = "https://aijobs.net/feed"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
@@ -24,6 +29,7 @@ def get_aijobs_jobs():
     
     if response.status_code == 200:
         print("Contenido crudo del RSS (primeros 1000 caracteres):")
+        # Imprimir como UTF-8 explícitamente
         print(response.text[:1000])
         
         try:
