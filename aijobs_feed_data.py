@@ -4,10 +4,14 @@ from datetime import datetime
 import xml.etree.ElementTree as ET
 import json
 import sys
+from flask import Flask, Response
 
 # Configurar la salida para usar UTF-8 en Windows
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
+
+# Inicializar la aplicación Flask
+app = Flask(__name__)
 
 def get_aijobs_jobs():
     url = "https://aijobs.net/feed"
@@ -51,9 +55,8 @@ def get_aijobs_jobs():
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(jobs, f, indent=4)
             
-            # Devolver solo el JSON de los trabajos como salida estándar
-            print(json.dumps(jobs))
-            return jobs
+            # Devolver exactamente lo mismo que el original: una cadena JSON
+            return json.dumps(jobs)
         except ET.ParseError as e:
             print(f"Error al parsear XML: {e}", file=sys.stderr)
             return None
@@ -61,7 +64,23 @@ def get_aijobs_jobs():
         print(f"Error inesperado: {response.status_code}", file=sys.stderr)
         return None
 
+# Ruta principal para invocar el script como API
+@app.route('/jobs', methods=['GET'])
+def fetch_jobs():
+    result = get_aijobs_jobs()
+    if result is not None:
+        # Devolver la cadena JSON como respuesta HTTP con tipo de contenido "application/json"
+        return Response(result, mimetype='application/json'), 200
+    else:
+        # En caso de error, devolver un mensaje JSON similar al comportamiento original
+        error_msg = json.dumps({"error": "No se pudieron obtener los trabajos"})
+        return Response(error_msg, mimetype='application/json'), 500
+
+# Ruta opcional para verificar que el servicio está vivo
+@app.route('/', methods=['GET'])
+def health_check():
+    return Response(json.dumps({"message": "Servicio de AIJobs activo"}), mimetype='application/json'), 200
+
 if __name__ == "__main__":
-    jobs = get_aijobs_jobs()
-    if not jobs:
-        sys.exit(1)  # Salir con error si no se obtienen trabajos
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
