@@ -54,7 +54,9 @@ def get_aijobs_jobs():
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(jobs, f, indent=4)
             
-            return json.dumps(jobs)
+            # Imprimir el JSON de trabajos en lugar de retornarlo como respuesta HTTP
+            print(json.dumps(jobs, indent=4))
+            return jobs
         except ET.ParseError as e:
             print(f"Error al parsear XML: {e}", file=sys.stderr)
             return None
@@ -66,7 +68,8 @@ def get_aijobs_jobs():
 def fetch_jobs():
     result = get_aijobs_jobs()
     if result is not None:
-        return Response(result, mimetype='application/json')
+        # Ahora devuelve la respuesta como json de la misma forma
+        return Response(json.dumps(result, indent=4), mimetype='application/json')
     else:
         error_msg = json.dumps({"error": "No se pudieron obtener los trabajos"})
         return Response(error_msg, mimetype='application/json', status=500)
