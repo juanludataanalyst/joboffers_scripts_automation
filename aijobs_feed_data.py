@@ -10,7 +10,6 @@ from flask import Flask, Response
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
-# Inicializar la aplicación Flask
 app = Flask(__name__)
 
 def get_aijobs_jobs():
@@ -47,7 +46,7 @@ def get_aijobs_jobs():
                 jobs.append(job)
             
             today = datetime.now().strftime("%Y-%m-%d")
-            hour = datetime.now().strftime("%H")  # Hora en formato 00-23
+            hour = datetime.now().strftime("%H")
             aijobs_dir = os.path.join("data", "aijobs")
             os.makedirs(aijobs_dir, exist_ok=True)
             file_path = os.path.join(aijobs_dir, f"{today}_aijobs_jobs_{hour}h.json")
@@ -55,7 +54,6 @@ def get_aijobs_jobs():
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(jobs, f, indent=4)
             
-            # Devolver exactamente lo mismo que el original: una cadena JSON
             return json.dumps(jobs)
         except ET.ParseError as e:
             print(f"Error al parsear XML: {e}", file=sys.stderr)
@@ -64,23 +62,19 @@ def get_aijobs_jobs():
         print(f"Error inesperado: {response.status_code}", file=sys.stderr)
         return None
 
-# Ruta principal para invocar el script como API
 @app.route('/jobs', methods=['GET'])
 def fetch_jobs():
     result = get_aijobs_jobs()
     if result is not None:
-        # Devolver la cadena JSON como respuesta HTTP con tipo de contenido "application/json"
-        return Response(result, mimetype='application/json'), 200
+        return Response(result, mimetype='application/json')
     else:
-        # En caso de error, devolver un mensaje JSON similar al comportamiento original
         error_msg = json.dumps({"error": "No se pudieron obtener los trabajos"})
-        return Response(error_msg, mimetype='application/json'), 500
+        return Response(error_msg, mimetype='application/json', status=500)
 
-# Ruta opcional para verificar que el servicio está vivo
 @app.route('/', methods=['GET'])
 def health_check():
-    return Response(json.dumps({"message": "Servicio de AIJobs activo"}), mimetype='application/json'), 200
+    return Response(json.dumps({"message": "Servicio de AIJobs activo"}), mimetype='application/json')
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.getenv("PORT", "8080"))
     app.run(host="0.0.0.0", port=port)
