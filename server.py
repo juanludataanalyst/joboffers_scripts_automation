@@ -2,6 +2,7 @@ from flask import Flask, Response, jsonify
 from aijobs_feed_data import get_aijobs_jobs
 from remotive_feed_data import get_remotive_jobs
 from remoteok_data import get_remoteok_jobs
+from jobicy_feed_data import get_jobicy_jobs
 import os
 import json
 
@@ -30,6 +31,14 @@ def fetch_remoteokjobs():  # Renombrado
     if jobs:
         return jsonify(jobs)
     return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
+
+@app.route('/jobs/jobicyjobs', methods=['GET'])
+def fetch_jobicyjobs():  # Renombrado
+    jobs = get_jobicy_jobs
+    if jobs:
+        return jsonify(jobs)
+    return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
+
 
 
 @app.route('/', methods=['GET'])
