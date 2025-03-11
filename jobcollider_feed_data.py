@@ -54,7 +54,7 @@ def get_jobscollider_jobs():
                 
                 for item in root.findall('.//item'):
                     title = item.find('title').text if item.find('title') is not None else ""
-                    company = title.split(': ', 1)[0] if ': ' in title else "Empresa no especificada"
+                    company = title.split(' at ', 1)[1] if ' at ' in title else "Empresa no especificada"
                     description = item.find('description').text if item.find('description') is not None else ""
                     pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
                     link = item.find('link').text if item.find('link') is not None else ""
