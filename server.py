@@ -34,7 +34,7 @@ def fetch_remoteokjobs():  # Renombrado
 
 @app.route('/jobs/jobicyjobs', methods=['GET'])
 def fetch_jobicyjobs():  # Renombrado
-    jobs = get_jobicy_jobs
+    jobs = get_jobicy_jobs()
     if jobs:
         return jsonify(jobs)
     return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
