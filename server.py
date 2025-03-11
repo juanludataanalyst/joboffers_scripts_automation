@@ -15,12 +15,11 @@ def fetch_aijobs():
 
 
 @app.route('/jobs/remotivejobs', methods=['GET'])
-def fetch_aijobs():
+def fetch_remotivejobs():  # Renombrado
     jobs = get_remotive_jobs()
     if jobs:
         return jsonify(jobs)
     return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
-
 
 
 @app.route('/', methods=['GET'])
