@@ -91,7 +91,7 @@ def get_jobscollider_jobs():
                 print(f"Error al parsear XML de {url}: {e}")
             
             # Sleep aleatorio entre 1 y 5 segundos
-            sleep_time = random.uniform(1, 5)
+            sleep_time = random.uniform(0.1, 0.5)
             print(f"Esperando {sleep_time:.2f} segundos antes de la siguiente llamada...")
             time.sleep(sleep_time)
         else:
