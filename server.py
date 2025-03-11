@@ -4,6 +4,7 @@ from remotive_feed_data import get_remotive_jobs
 from remoteok_data import get_remoteok_jobs
 from jobicy_feed_data import get_jobicy_jobs
 from weworkremotely_feed_data import get_weworkremotely_jobs
+from jobcollider_feed_data import get_jobscollider_jobs
 
 import os
 import json
@@ -47,7 +48,14 @@ def fetch_weworkremotelyjobs():  # Renombrado
     jobs = get_weworkremotely_jobs()
     if jobs:
         return jsonify(jobs)
-    return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
+    return Response(json.dumps({"error": "No se pudieron obtener los trabajos weworkremotely jobs"}), status=500, mimetype='application/json')
+
+@app.route('/jobs/jobscolliderjobs', methods=['GET'])
+def fetch_jobscolliderjobs():  # Renombrado
+    jobs = get_jobscollider_jobs()
+    if jobs:
+        return jsonify(jobs)
+    return Response(json.dumps({"error": "No se pudieron obtener los trabajos jobscollider jobs"}), status=500, mimetype='application/json')
 
 
 
