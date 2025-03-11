@@ -3,6 +3,8 @@ from aijobs_feed_data import get_aijobs_jobs
 from remotive_feed_data import get_remotive_jobs
 from remoteok_data import get_remoteok_jobs
 from jobicy_feed_data import get_jobicy_jobs
+from weworkremotely_feed_data import get_weworkremotely_jobs
+
 import os
 import json
 
@@ -38,6 +40,15 @@ def fetch_jobicyjobs():  # Renombrado
     if jobs:
         return jsonify(jobs)
     return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
+
+
+@app.route('/jobs/weworkremotelyjobs', methods=['GET'])
+def fetch_weworkremotelyjobs():  # Renombrado
+    jobs = get_weworkremotely_jobs()
+    if jobs:
+        return jsonify(jobs)
+    return Response(json.dumps({"error": "No se pudieron obtener los trabajos remotive jobs"}), status=500, mimetype='application/json')
+
 
 
 
