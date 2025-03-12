@@ -1,8 +1,39 @@
 import requests
-import os
-from datetime import datetime
 import xml.etree.ElementTree as ET
 import json
+import sys
+import html
+import unicodedata
+from datetime import datetime
+from bs4 import BeautifulSoup
+
+# Configurar la salida para usar UTF-8 en Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
+
+def parse_date(pubdate_str):
+    """Convierte una fecha como 'Wed, 12 Mar 2025 20:30:54 +0000' a 'YYYY-MM-DD'"""
+    try:
+        dt = datetime.strptime(pubdate_str, "%a, %d %b %Y %H:%M:%S %z")
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return ""
+
+def clean_text(text):
+    """Limpia texto: decodifica HTML, normaliza Unicode y preserva saltos de línea"""
+    if not text:
+        return ""
+    text = html.unescape(text)
+    text = unicodedata.normalize('NFC', text)
+    return text.strip()
+
+def clean_html_description(html_text):
+    """Convierte HTML a texto plano preservando saltos de línea"""
+    if not html_text:
+        return ""
+    # Parsear HTML y separar elementos con \n
+    soup = BeautifulSoup(html_text, 'html.parser')
+    return clean_text(soup.get_text(separator='\n'))
 
 def get_weworkremotely_jobs():
     url = "https://weworkremotely.com/remote-jobs.rss"
@@ -11,49 +42,46 @@ def get_weworkremotely_jobs():
     }
     
     try:
-        print(f"Intentando RSS: {url}")
+        print(f"Intentando RSS: {url}", file=sys.stderr)
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        print(f"Error HTTP: {e}")
-        print(f"Respuesta del servidor: {response.text}")
+        print(f"Error HTTP: {e}", file=sys.stderr)
         return None
     except requests.exceptions.RequestException as e:
-        print(f"Error de conexión: {e}")
+        print(f"Error de conexión: {e}", file=sys.stderr)
         return None
     
     if response.status_code == 200:
-        root = ET.fromstring(response.content)
-        jobs = []
-        namespaces = {'media': 'http://search.yahoo.com/mrss/'}
-        
-        for item in root.findall('.//item'):
-            title = item.find('title').text if item.find('title') is not None else ""
-            company = title.split(': ', 1)[0] if ': ' in title else "Empresa no especificada"
-            job = {
-                "title": title,
-                "company": company,
-                "region": item.find('region').text if item.find('region') is not None else "Ubicación no especificada",
-                "category": item.find('category').text if item.find('category') is not None else "Rol no especificado",
-                "type": item.find('type').text if item.find('type') is not None else "No especificado",
-                "description": item.find('description').text if item.find('description') is not None else "",
-                "pubDate": item.find('pubDate').text if item.find('pubDate') is not None else "",
-                "link": item.find('link').text if item.find('link') is not None else "",
-                "media_content": item.find('media:content', namespaces).get('url') if item.find('media:content', namespaces) is not None else ""
-            }
-            jobs.append(job)
-        
-        today = datetime.now().strftime("%Y-%m-%d")
-        wwr_dir = os.path.join("data", "weworkremotely")
-        os.makedirs(wwr_dir, exist_ok=True)
-        file_path = os.path.join(wwr_dir, f"{today}_weworkremotely_jobs_general.json")
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(jobs, f, indent=4)
-        
-        # Imprimir el JSON de trabajos en lugar de retornarlo como respuesta HTTP
-        print(json.dumps(jobs, indent=4))
-        return jobs
+        try:
+            root = ET.fromstring(response.content)
+            jobs = []
+            
+            for item in root.findall('.//item'):
+                title = clean_text(item.find('title').text if item.find('title') is not None else "")
+                company = title.split(': ', 1)[0] if ': ' in title else "Empresa no especificada"
+                job = {
+                    "title": title,
+                    "date": parse_date(item.find('pubDate').text) if item.find('pubDate') is not None else "",
+                    "company": company,
+                    "location": clean_text(item.find('region').text if item.find('region') is not None else "Ubicación no especificada"),
+                    "category": [clean_text(item.find('category').text)] if item.find('category') is not None else [],
+                    "type": clean_text(item.find('type').text if item.find('type') is not None else "No especificado"),
+                    "description": clean_html_description(item.find('description').text if item.find('description') is not None else ""),
+                    "link": clean_text(item.find('link').text if item.find('link') is not None else ""),
+                    "source": "weworkremotely"
+                }
+                jobs.append(job)
+            
+            # Imprimir el JSON por salida estándar
+            print(json.dumps(jobs, indent=4, ensure_ascii=False))
+            return jobs
+        except ET.ParseError as e:
+            print(f"Error al parsear XML: {e}", file=sys.stderr)
+            return None
     else:
-        print(f"Error inesperado: {response.status_code}")
+        print(f"Error inesperado: {response.status_code}", file=sys.stderr)
         return None
+
+if __name__ == "__main__":
+    get_weworkremotely_jobs()
