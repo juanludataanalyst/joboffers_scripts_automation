@@ -19,13 +19,12 @@ def parse_date(pubdate_str):
         return ""
 
 def clean_text(text):
-    """Limpia texto: decodifica HTML, normaliza Unicode y elimina caracteres extraños"""
+    """Limpia texto: decodifica HTML, normaliza Unicode y preserva saltos de línea"""
     if not text:
         return ""
-    # Decodificar entidades HTML (ej. &amp; → &)
     text = html.unescape(text)
-    # Normalizar Unicode a forma NFC (combina caracteres como 'e' + '́' en 'é')
     text = unicodedata.normalize('NFC', text)
+    # Preservamos los saltos de línea implícitos
     return text.strip()
 
 def get_aijobs_jobs():
@@ -62,7 +61,6 @@ def get_aijobs_jobs():
                 }
                 jobs.append(job)
             
-            # Solo imprimimos el JSON por salida estándar
             print(json.dumps(jobs, indent=4, ensure_ascii=False))
             return jobs
         except ET.ParseError as e:
