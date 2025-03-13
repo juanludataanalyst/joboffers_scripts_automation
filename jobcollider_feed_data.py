@@ -1,14 +1,49 @@
 import requests
-import os
-from datetime import datetime
 import xml.etree.ElementTree as ET
 import json
+import sys
+import html
+import unicodedata
+from datetime import datetime
 from bs4 import BeautifulSoup
 import time
 import random
 
+# Configurar la salida para usar UTF-8 en Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
+
+def parse_date(pubdate_str):
+    """Convierte una fecha como 'Thu, 06 Mar 2025 03:23:17 +0000' a 'YYYY-MM-DD'"""
+    try:
+        dt = datetime.strptime(pubdate_str, "%a, %d %b %Y %H:%M:%S %z")
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return datetime.now().strftime("%Y-%m-%d")
+
+def clean_text(text):
+    """Limpia texto: decodifica HTML, normaliza Unicode y preserva saltos de línea"""
+    if not text:
+        return ""
+    text = html.unescape(text)
+    text = unicodedata.normalize('NFC', text)
+    return text.strip()
+
+def clean_html_description(html_text):
+    """Convierte HTML a texto plano preservando saltos de línea"""
+    if not html_text:
+        return ""
+    soup = BeautifulSoup(html_text, 'html.parser')
+    return clean_text(soup.get_text(separator='\n'))
+
+def extract_id_from_guid(guid):
+    """Extrae el ID numérico del guid (ej. '451872' de 'https://jobscollider.com/jobs/...-451872')"""
+    if guid and guid.startswith("https://jobscollider.com/jobs/"):
+        return guid.split('-')[-1]
+    return ""
+
 def get_jobscollider_jobs():
-    # Lista de feeds por categoría según la documentación de JobsCollider
+    # Lista de feeds por categoría según JobsCollider
     feeds = [
         ("software_development", "https://jobscollider.com/remote-software-development-jobs.rss"),
         ("cybersecurity", "https://jobscollider.com/remote-cybersecurity-jobs.rss"),
@@ -36,83 +71,56 @@ def get_jobscollider_jobs():
     
     for category_name, url in feeds:
         try:
-            print(f"Intentando RSS: {url}")
+            print(f"Intentando RSS: {url}", file=sys.stderr)
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            print(f"Error HTTP: {e}")
-            print(f"Respuesta del servidor: {response.text if 'response' in locals() else 'No disponible'}")
+            print(f"Error HTTP: {e}", file=sys.stderr)
             continue
         except requests.exceptions.RequestException as e:
-            print(f"Error de conexión: {e}")
+            print(f"Error de conexión: {e}", file=sys.stderr)
             continue
         
         if response.status_code == 200:
             try:
                 root = ET.fromstring(response.content)
-                namespaces = {'content': 'http://purl.org/rss/1.0/modules/content/'}
-                
                 for item in root.findall('.//item'):
-                    title = item.find('title').text if item.find('title') is not None else ""
+                    title = clean_text(item.find('title').text if item.find('title') is not None else "")
                     company = title.split(' at ', 1)[1] if ' at ' in title else "Empresa no especificada"
-                    description = item.find('description').text if item.find('description') is not None else ""
-                    pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
-                    link = item.find('link').text if item.find('link') is not None else ""
                     guid = item.find('guid').text if item.find('guid') is not None else ""
-
-                    # Limpiar el HTML del campo description
-                    soup = BeautifulSoup(description, 'html.parser')
-                    cleaned_description = soup.get_text()
-
-                    # Formatear la fecha
-                    try:
-                        date_obj = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %z")
-                        formatted_date = date_obj.strftime("%Y-%m-%d")
-                    except ValueError:
-                        formatted_date = datetime.now().strftime("%Y-%m-%d")
-
+                    
                     job = {
                         "title": title,
+                        "date": parse_date(item.find('pubDate').text) if item.find('pubDate') is not None else "",
                         "company": company,
-                        "region": "Ubicación no especificada",
-                        "category": category_name,
-                        "type": "No especificado",
-                        "description": cleaned_description,
-                        "pubDate": formatted_date,
-                        "link": link,
-                        "guid": guid,
-                        "source": "jobscollider"
+                        "location": "Not available",
+                        "category": [category_name],
+                        "description": clean_html_description(item.find('description').text if item.find('description') is not None else ""),
+                        "link": clean_text(item.find('link').text if item.find('link') is not None else ""),
+                        "source": "jobscollider",
+                        "id_source": extract_id_from_guid(guid)
                     }
                     all_jobs.append(job)
                 
-                print(f"Procesados {len(all_jobs)} trabajos hasta ahora.")
+                print(f"Procesados {len(all_jobs)} trabajos hasta ahora.", file=sys.stderr)
                 
             except ET.ParseError as e:
-                print(f"Error al parsear XML de {url}: {e}")
+                print(f"Error al parsear XML de {url}: {e}", file=sys.stderr)
             
-            # Sleep aleatorio entre 1 y 5 segundos
+            # Sleep aleatorio entre 0.1 y 0.5 segundos
             sleep_time = random.uniform(0.1, 0.5)
-            print(f"Esperando {sleep_time:.2f} segundos antes de la siguiente llamada...")
+            print(f"Esperando {sleep_time:.2f} segundos antes de la siguiente llamada...", file=sys.stderr)
             time.sleep(sleep_time)
         else:
-            print(f"Error inesperado: {response.status_code} para {url}")
+            print(f"Error inesperado: {response.status_code} para {url}", file=sys.stderr)
     
-    # Guardar todos los trabajos en un solo archivo
+    # Imprimir el JSON por salida estándar
     if all_jobs:
-        today = datetime.now().strftime("%Y-%m-%d")
-        jc_dir = os.path.join("data", "jobscollider")
-        os.makedirs(jc_dir, exist_ok=True)
-        file_path = os.path.join(jc_dir, f"{today}_jobscollider_jobs_all.json")
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(all_jobs, f, indent=4, ensure_ascii=False)
-        
-        print(f"Datos guardados en: {file_path}. Total de trabajos: {len(all_jobs)}")
-        
-        # Imprimir el JSON de trabajos
-        print(json.dumps(all_jobs, indent=4))
-        
+        print(json.dumps(all_jobs, indent=4, ensure_ascii=False))
+    else:
+        print("No se encontraron trabajos.", file=sys.stderr)
+    
     return all_jobs
 
-
-
+if __name__ == "__main__":
+    get_jobscollider_jobs()
