@@ -1,8 +1,38 @@
 import requests
-import os
-from datetime import datetime
 import xml.etree.ElementTree as ET
 import json
+import sys
+import html
+import unicodedata
+from datetime import datetime
+from bs4 import BeautifulSoup
+
+# Configurar la salida para usar UTF-8 en Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding='utf-8')
+
+def parse_date(pubdate_str):
+    """Convierte una fecha como '12.03.2025' a 'YYYY-MM-DD'"""
+    try:
+        dt = datetime.strptime(pubdate_str, "%d.%m.%Y")
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return datetime.now().strftime("%Y-%m-%d")
+
+def clean_text(text):
+    """Limpia texto: decodifica HTML, normaliza Unicode y preserva saltos de línea"""
+    if not text:
+        return ""
+    text = html.unescape(text)
+    text = unicodedata.normalize('NFC', text)
+    return text.strip()
+
+def clean_html_description(html_text):
+    """Convierte HTML a texto plano preservando saltos de línea"""
+    if not html_text:
+        return ""
+    soup = BeautifulSoup(html_text, 'html.parser')
+    return clean_text(soup.get_text(separator='\n'))
 
 def get_jobicy_jobs():
     url = "https://jobicy.com/feed/newjobs"
@@ -11,63 +41,46 @@ def get_jobicy_jobs():
     }
     
     try:
-        print(f"Intentando RSS: {url}")
+        print(f"Intentando RSS: {url}", file=sys.stderr)
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        print(f"Error HTTP: {e}")
-        print(f"Respuesta del servidor: {response.text}")
+        print(f"Error HTTP: {e}", file=sys.stderr)
         return None
     except requests.exceptions.RequestException as e:
-        print(f"Error de conexión: {e}")
+        print(f"Error de conexión: {e}", file=sys.stderr)
         return None
     
     if response.status_code == 200:
-        print("Contenido crudo del RSS (primeros 1000 caracteres):")
-        print(response.text[:1000])
-        
         try:
             root = ET.fromstring(response.content)
             jobs = []
             
             for job_elem in root.findall('.//job'):
+                job_id = job_elem.get('id', "")
                 job = {
-                    "name": job_elem.find('name').text if job_elem.find('name') is not None else "",
-                    "company": job_elem.find('company').text if job_elem.find('company') is not None else "Empresa no especificada",
-                    "description": job_elem.find('description').text if job_elem.find('description') is not None else "",
-                    "pubdate": job_elem.find('pubdate').text if job_elem.find('pubdate') is not None else "",
-                    "link": job_elem.find('link').text if job_elem.find('link') is not None else "",
-                    "region": job_elem.find('region').text if job_elem.find('region') is not None else "Ubicación no especificada",
-                    "jobtype": job_elem.find('jobtype').text if job_elem.find('jobtype') is not None else "No especificado",
+                    "title": clean_text(job_elem.find('name').text if job_elem.find('name') is not None else ""),
+                    "date": parse_date(job_elem.find('pubdate').text) if job_elem.find('pubdate') is not None else "",
+                    "company": clean_text(job_elem.find('company').text if job_elem.find('company') is not None else "Empresa no especificada"),
+                    "location": clean_text(job_elem.find('region').text if job_elem.find('region') is not None else "Not available"),
+                    "type": clean_text(job_elem.find('jobtype').text if job_elem.find('jobtype') is not None else "Not specified"),
+                    "description": clean_html_description(job_elem.find('description').text if job_elem.find('description') is not None else ""),
+                    "link": clean_text(job_elem.find('link').text if job_elem.find('link') is not None else ""),
+                    "source": "jobicy",
+                    "id_source": job_id
                 }
                 jobs.append(job)
             
-            print(f"Número de trabajos encontrados: {len(jobs)}")
-            
-            today = datetime.now().strftime("%Y-%m-%d")
-            jobicy_dir = os.path.join("data", "jobicy")
-            os.makedirs(jobicy_dir, exist_ok=True)
-            file_path = os.path.join(jobicy_dir, f"{today}_jobicy_jobs.json")
-            
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(jobs, f, indent=4)
-            
-                # Imprimir el JSON de trabajos en lugar de retornarlo como respuesta HTTP
-            print(json.dumps(jobs, indent=4))
+            # Imprimir el JSON por salida estándar
+            print(json.dumps(jobs, indent=4, ensure_ascii=False))
             return jobs
         
         except ET.ParseError as e:
-            print(f"Error al parsear XML: {e}")
-            print("Contenido recibido:")
-            print(response.text)
+            print(f"Error al parsear XML: {e}", file=sys.stderr)
             return None
     else:
-        print(f"Error inesperado: {response.status_code}")
+        print(f"Error inesperado: {response.status_code}", file=sys.stderr)
         return None
 
 if __name__ == "__main__":
-    jobs = get_jobicy_jobs()
-    if jobs:
-        print(f"Obtenidas {len(jobs)} ofertas de trabajo.")
-    else:
-        print("No se obtuvieron trabajos.")
+    get_jobicy_jobs()
